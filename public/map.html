@@ -1,0 +1,194 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>ArcGIS API for JavaScript Tutorials: Reverse geocode</title>
+    <style>
+        html,
+        body,
+        #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.22/"></script>
+    
+    <script>
+        var baseURL = window.location.origin+"/API/api"
+        require([
+            "esri/config",
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/Graphic",
+            "esri/rest/locator","dojo/dom-construct","dojo/on","esri/widgets/Search","esri/widgets/BasemapGallery",
+			"esri/widgets/Expand"
+
+        ], function (esriConfig, Map, MapView,Graphic, locator,domConstruct,On,Search,BasemapGallery,Expand) {
+
+            esriConfig.apiKey = "AAPKe20358bbea714b54bbf850c7b10cffaeX7kOk8HsoAY1WVM_5YPAcuSLuB3GfCY0fCx3T3ajF5CqTVaLftdDDOn5SjQBnalO";
+            let params = (new URL(document.location)).searchParams;
+            let id = params.get("property");
+            axios.get(baseURL + '/Property/List/' + id).then(resp => {
+              
+                const map = new Map({
+                basemap: "arcgis-navigation"
+                });
+
+                const view = new MapView({
+                    container: "viewDiv",
+                    map: map,
+                    center: [-119.734, 39.193],
+                    zoom: 16
+                });
+                const   getParameterByName = (name, url = window.location.href) =>{
+                    name = name.replace(/[\[\]]/g, '\\$&');
+                    var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+                        results = regex.exec(url);
+                    if (!results) return null;
+                    if (!results[2]) return '';
+                    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+                }
+                const saveLocation = (mapPoint)=>{
+                    var id = getParameterByName('property')
+                    var coordinates = [Math.round(mapPoint.longitude * 100000) / 100000, Math.round( mapPoint.latitude * 100000) / 100000]
+                    axios.post(baseURL + '/Property/Location/' + id, {
+                        type: 'Point',
+                        coordinates: coordinates.reverse()
+                    }, {
+                        headers: {
+                            Authorization: 'Bearer ' + sessionStorage.getItem('token'),
+                            'Grant': sessionStorage.getItem('idToken')
+                        }
+                    }).then(resp => {
+                        addGraphics([resp.data])
+                        view.popup.close()
+                    })
+                }
+                const  showAddress= (address, pt) =>{
+                    const root = domConstruct.toDom("<div></div>")
+                    const content = domConstruct.toDom("<p>"+address+"</p>")
+                    const button =  domConstruct.toDom("<button>Save Location</button>")
+                    On(button,"click",()=>{
+                        saveLocation(pt)
+                    })
+                    root.append(content)
+                    root.append(button)
+                    view.popup.open({
+                        title: + Math.round(pt.longitude * 100000) / 100000 + ", " + Math.round(pt.latitude * 100000) / 100000,
+                        content: root,
+                        location: pt
+                    });
+
+                }
+                const addGraphics = (response) => {
+                    view.graphics.removeAll()
+                    response.forEach( (e, idx) => {
+                        if (e.location) {
+                            const { propertyName, location, _id } = e
+                            if (location.coordinates) {
+                                const { coordinates } = location
+                                
+                                
+                                const pointGraphic = new Graphic({
+                                    geometry: {
+                                            type: "point",
+                                            latitude: coordinates[0],
+                                            longitude: coordinates[1]
+                                    },
+                                    attributes: {
+                                        OBJECTID: idx,
+                                        name: propertyName,
+                                        id: _id
+                                    },
+                                    symbol: {
+                                        type: "web-style",
+                                        name: 'box-pin',
+                                        styleName: "Esri2DPointSymbolsStyle"
+                                    },
+                                    popupTemplate: {
+                                        title: '{name}&nbsp;<a href="#/leaselist/{id}" class="border border-white px-1 rounded font-weight-light text-light float-right" >View</a>',
+                                        content: '{name}',
+                                    },
+                                });
+                                view.graphics.add(pointGraphic)
+                                
+                            }  
+                        }  
+    
+                    })
+                    setTimeout(function(){
+                        recenter(response)
+                    } ,1000 ) 
+                }
+                const  recenter= (data)=>{
+                    let opts = {
+                        //duration: 2000  // Duration of animation will be 5 seconds
+                    };
+                    let center = data && data.length > 0 ? data[0].location.coordinates.reverse() : [ -119.73776383440293,39.191158471149436]
+                    // go to point at LOD 15 with custom duration
+                    view.goTo({
+                        center: center,
+                        zoom: 12
+                    }, opts);
+                }
+                const serviceUrl = "http://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer";
+				let basemapGallery = new BasemapGallery({
+				  view: view
+				});
+				const bgExpand = new Expand({
+					view: view,
+					content: basemapGallery
+				});
+				basemapGallery.watch("activeBasemap", () => {debugger
+				  
+ 
+					bgExpand.collapse();
+				   
+				});
+				view.ui.add(bgExpand, {
+				  position: "top-leading"
+				});
+				 const search = new Search({  //Add Search widget
+					view: view
+				});
+				view.ui.add(search, {
+				  position: "top-right"
+				});	
+                view.on("click", function (evt) {
+                    const params = {
+                        location: evt.mapPoint
+                    };
+                    
+                    locator.locationToAddress(serviceUrl, params)
+                        .then(function (response) { // Show the address found
+                            const address = response.address;
+                            showAddress(address, evt.mapPoint);
+                             
+                           
+                        }, function (err) { // Show no address found
+                            showAddress("No address found.", evt.mapPoint);
+                        });
+
+                });
+
+                addGraphics([resp.data])
+            })
+            
+            
+
+        });
+
+        
+    </script>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+</body>
+
+</html>

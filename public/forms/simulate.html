@@ -1,0 +1,65 @@
+<html>
+  <head>
+    <!--
+      required editor styles
+    -->
+    
+     
+	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
+    
+	<link rel="stylesheet" href="form-js/dist/assets/form-js.css">
+  
+	
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+      }
+
+      #form {
+        max-width: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="form"></div>
+    
+ 
+    <script src="form-js/dist/form-viewer.umd.js"></script>
+
+    <script>
+      var viewer;
+      function saveFormData(){
+        if(viewer && viewer?._state?.errors && Object.keys(viewer?._state?.errors)?.length == 0)
+        {
+          window.top.postMessage({source:"formjs", formData:viewer._state.data  })
+
+        } 
+        
+      }
+      window.onmessage = function(e) {
+        if (e.data) 
+        {
+          var schema =  { "schemaVersion": 1, "exporter": {    "name": "form-js", "version": "0.1.0"  },  "type": "default"}
+		  schema.components = e.data.components 	
+          var container = document.querySelector('#form');
+          FormViewer.createForm({
+            container,
+            schema
+          })
+          .then(function(e){debugger;
+            viewer = e
+            viewer.on("submit", saveFormData);
+            
+		  });
+
+          
+        }
+      };
+      
+    </script>
+  </body>
+</html>

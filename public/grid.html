@@ -1,0 +1,185 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>ArcGIS API for JavaScript Tutorials: Reverse geocode</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.22/"></script>
+    <style>
+        html,
+        body,
+        #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        #info button {
+            padding: 8px 7px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+    <script>
+        var baseURL = window.location.origin+"/API/api"
+        require([
+            "esri/config",
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/geometry/SpatialReference","esri/geometry/Point",
+            "esri/rest/locator",
+            "esri/Graphic",
+            "esri/layers/FeatureLayer","esri/widgets/Search","esri/widgets/BasemapGallery",
+			"esri/widgets/Expand"
+
+        ], function (esriConfig, Map, MapView, SpatialReference,Point, locator, Graphic, FeatureLayer,
+		 Search,BasemapGallery,Expand) {
+
+            esriConfig.apiKey = "AAPKe20358bbea714b54bbf850c7b10cffaeX7kOk8HsoAY1WVM_5YPAcuSLuB3GfCY0fCx3T3ajF5CqTVaLftdDDOn5SjQBnalO";
+            const map = new Map({
+                basemap: "hybrid"
+            })
+
+            const view = new MapView({
+                map: map, 
+                center: [-119.73776383440293,39.191158471149436], // Longitude, latitude
+                zoom: 16, // Zoom level
+                container: "viewDiv",// Div element,
+                // ui: {
+                //     components: ["attribution"]
+                // }
+            });
+			let basemapGallery = new BasemapGallery({
+			  view: view
+			});
+			const bgExpand = new Expand({
+				view: view,
+				content: basemapGallery
+			});
+			basemapGallery.watch("activeBasemap", () => {debugger
+			  
+
+				bgExpand.collapse();
+			   
+			});
+			view.ui.add(bgExpand, {
+			  position: "top-leading"
+			});
+			 const search = new Search({  //Add Search widget
+				view: view
+			});
+			view.ui.add(search, {
+			  position: "top-right"
+			});	
+            let params = (new URL(document.location)).searchParams;
+            let id = params.get("property");
+            console.log('window', window)
+            window.addEventListener('storage', () => {
+                const resp = sessionStorage.getItem('mapData')
+                const data = JSON.parse(resp)
+                if (data.length) {
+                    view.graphics.removeAll()
+                    addGraphics(data)
+                }
+
+
+            });
+
+            if (id) {
+                axios.get(baseURL + '/Property/List/' + id).then(resp => {
+                    addGraphics([resp.data])
+                })
+            } else {
+                // axios.get(baseURL + '/Property/Grid').then(resp => {
+                //     console.log('grid',resp.data)
+                //     addGraphics(resp.data)
+                // })
+
+                const resp = sessionStorage.getItem('mapData')
+                const data = JSON.parse(resp)
+                if (data.length) {
+                    addGraphics(data)
+                }
+
+            }
+
+            function addGraphics(response) {
+                 
+                response.forEach( (e, idx) => {
+                    if (e.location) {
+                        const { name, location, _id } = e
+						const href = window.location.origin+"/#/listings/"+_id
+                        if (location.coordinates) {
+                            const { coordinates } = location
+                            
+                            
+                            const pointGraphic = new Graphic({
+                                geometry: {
+                                        type: "point",
+                                        latitude: coordinates[0],
+                                        longitude: coordinates[1]
+                                },
+                                attributes: {
+                                    OBJECTID: idx,
+                                    name: name,
+                                    id: _id
+                                },
+                                symbol: {
+                                    type: "web-style",
+                                    name: 'box-pin',
+                                    styleName: "Esri2DPointSymbolsStyle"
+                                },
+                                popupTemplate: {
+                                    title: '{name}',
+                                    content: '&nbsp;<a href="'+href+'" class="border border-white px-1 rounded font-weight-light text-light float-right" >View</a>',
+                                },
+                            });
+                            view.graphics.add(pointGraphic)
+                             
+                        }  
+                    }  
+
+                })
+                setTimeout(function(){
+                    recenter(response)
+                } ,1000 ) 
+            }
+            function recenter(data){
+                let opts = {
+                    //duration: 2000  // Duration of animation will be 5 seconds
+                };
+                let center = data && data.length > 0 ? data[0].location.coordinates.reverse() : [ -119.73776383440293,39.191158471149436]
+                // go to point at LOD 15 with custom duration
+                view.goTo({
+                    center: center,
+                    zoom: 14
+                }, opts);
+            }
+            document.getElementById("recenter").onclick = () => {
+                recenter()
+            };
+
+            view.ui.add("info", {
+                position: "top-left",
+                index: 1
+            });
+           
+
+
+        });
+    </script>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+    <div id="info">
+        <button title='Recenter Map' id='recenter' class='esri-icon-refresh'>
+
+        </button>
+    </div>
+</body>
+
+</html>

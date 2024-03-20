@@ -1,0 +1,60 @@
+<html>
+  <head>
+    <!--
+      required editor styles
+    -->
+    
+     
+	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+  
+	<link rel="stylesheet" href="form-js/dist/assets/form-js.css">
+    <link rel="stylesheet" href="form-js/dist/assets/form-js-editor.css">
+    <link rel="stylesheet" href="form-js/dist/assets/dragula.css">
+	
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+      }
+
+      #form {
+        max-width: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="form"></div>
+    <img src="saveicon.png" width="50" height="50" title="Save Builder" onclick="javascript:saveBuilder();"
+        style="position: absolute;bottom:10px;left:10px;z-index: 9999;cursor:pointer" >
+    
+ 
+    <script src="form-js/dist/form-editor.umd.js"></script>
+
+    <script>
+      var editor;
+      function saveBuilder(){
+        var schema = editor.saveSchema()
+        window.top.postMessage({source:"formjs", schema:{ components:schema.components} })
+      }
+      window.onmessage = function(e) {
+        if (e.data) 
+        {
+          var schema =  { "schemaVersion": 1, "exporter": {    "name": "form-js", "version": "0.1.0"  },  "type": "default"}
+		      schema.components = e.data.components 	
+          var container = document.querySelector('#form');
+
+           FormEditor.createFormEditor({
+            container,
+            schema
+          }).then((e)=>{
+			editor = e;
+		  });
+        }
+      };
+      
+    </script>
+  </body>
+</html>
